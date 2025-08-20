@@ -19,7 +19,8 @@ def make_main_menu():
     btn_delivery = types.KeyboardButton('🚚 Доставка')
     btn_contacts = types.KeyboardButton('📞 Контакти')
     btn_order = types.KeyboardButton('🛒 Зробити замовлення')
-    markup.add(btn_product, btn_price, btn_delivery, btn_contacts, btn_order)
+    btn_location = types.KeyboardButton('🗺️ Де ми знаходимось')  # Нова кнопка
+    markup.add(btn_product, btn_price, btn_delivery, btn_contacts, btn_order, btn_location)
     return markup
 
 # Команди /start та /help
@@ -27,7 +28,7 @@ def make_main_menu():
 def send_welcome(message):
     welcome_text = """
 Вітаю! Я віртуальний помічник компанії ТЕК.
-Чим можу допомогти? Оберіть опцію з меню👇
+Чим можу допомогти? Оберіть опціу з меню👇
     """
     bot.send_message(message.chat.id, welcome_text, reply_markup=make_main_menu())
 
@@ -113,6 +114,31 @@ LLC.peatenergy@gmail.com
     """
     bot.send_message(message.chat.id, contacts_text, parse_mode='HTML')
 
+# Обробник для "🗺️ Де ми знаходимось"
+@bot.message_handler(func=lambda message: message.text == '🗺️ Де ми знаходимось')
+def send_location(message):
+    # Координати вашого складу
+    latitude = 50.70145383475299
+    longitude = 26.354577705876483
+    
+    # Відправляємо локацію на карті
+    bot.send_location(message.chat.id, latitude, longitude)
+    
+    # Додаємо посилання на Google Maps
+    maps_text = """
+🗺️ <b>Наше місцезнаходження:</b>
+
+<b>Адреса:</b>
+Рівненський район, Забороль вул. Колгоспна 41Є
+
+<b>Посилання на Google Maps:</b>
+https://maps.app.goo.gl/?q=50.70145383475299,26.354577705876483
+
+<b>Графік роботи:</b>
+Пн-Нд: 9:00-19:00
+"""
+    bot.send_message(message.chat.id, maps_text, parse_mode='HTML')
+
 # Обробник для "🛒 Зробити замовлення"
 @bot.message_handler(func=lambda message: message.text == '🛒 Зробити замовлення')
 def start_order(message):
@@ -163,8 +189,7 @@ def send_order_to_admin(chat_id):
     
 💬 Чат ID: {chat_id}
     """
-    # ЗАМІНИТЬ НА ВАШ CHAT_ID (отримайте через @userinfobot)
-    admin_chat_id = '452999752'
+    admin_chat_id = '452999752'  # Ваш Chat ID
     bot.send_message(admin_chat_id, order_text)
 
 # Обробник для скасування
