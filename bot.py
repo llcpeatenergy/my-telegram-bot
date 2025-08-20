@@ -1,22 +1,28 @@
 import telebot
 import os
+from telebot import types
+from flask import Flask
+import threading
 
-# Токен тепер береться з безпечного місця на Koyeb
+# Токен береться зі змінних середовища
 API_TOKEN = os.getenv('API_TOKEN') 
 bot = telebot.TeleBot(API_TOKEN)
 
-# Функція для створення головного меню з кнопками
+# Словник для зберігання даних замовлень
+user_data = {}
+
+# Функція для створення головного меню
 def make_main_menu():
-    markup = telebot.types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    btn_product = telebot.types.KeyboardButton('📋 Продукція')
-    btn_price = telebot.types.KeyboardButton('💰 Ціни')
-    btn_delivery = telebot.types.KeyboardButton('🚚 Доставка')
-    btn_contacts = telebot.types.KeyboardButton('📞 Контакти')
-    btn_order = telebot.types.KeyboardButton('🛒 Зробити замовлення')
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    btn_product = types.KeyboardButton('📋 Продукція')
+    btn_price = types.KeyboardButton('💰 Ціни')
+    btn_delivery = types.KeyboardButton('🚚 Доставка')
+    btn_contacts = types.KeyboardButton('📞 Контакти')
+    btn_order = types.KeyboardButton('🛒 Зробити замовлення')
     markup.add(btn_product, btn_price, btn_delivery, btn_contacts, btn_order)
     return markup
 
-# Обробник команд /start та /help
+# Команди /start та /help
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     welcome_text = """
@@ -25,7 +31,7 @@ def send_welcome(message):
     """
     bot.send_message(message.chat.id, welcome_text, reply_markup=make_main_menu())
 
-# Обробник для кнопки "📋 Продукція"
+# Обробник для "📋 Продукція"
 @bot.message_handler(func=lambda message: message.text == '📋 Продукція')
 def send_product_info(message):
     product_text = """
@@ -44,12 +50,12 @@ def send_product_info(message):
 <b>Застосування:</b>
 • Котли опалення
 • Каміни та печі
-• Бойлерні
+• Котельні
 • Твердопаливні генератори
     """
     bot.send_message(message.chat.id, product_text, parse_mode='HTML')
 
-# Обробник для кнопки "💰 Ціни"
+# Обробник для "💰 Ціни"
 @bot.message_handler(func=lambda message: message.text == '💰 Ціни')
 def send_price_info(message):
     price_text = """
@@ -58,8 +64,6 @@ def send_price_info(message):
 <b>Роздріб:</b>
 • Біг Бег (1000 кг) — <b>7000 грн</b>
 
-
-
 <b>Вартість доставки:</b>
 • розраховується індивідуально
 
@@ -67,7 +71,7 @@ def send_price_info(message):
     """
     bot.send_message(message.chat.id, price_text, parse_mode='HTML')
 
-# Обробник для кнопки "🚚 Доставка"
+# Обробник для "🚚 Доставка"
 @bot.message_handler(func=lambda message: message.text == '🚚 Доставка')
 def send_delivery_info(message):
     delivery_text = """
@@ -76,18 +80,16 @@ def send_delivery_info(message):
 <b>Регіони доставки:</b>
 • Доставляємо по всій Україні (окрім поки що окупованих територій)
 
-
 <b>Способи оплати:</b>
 • Готівковий розрахунок
 • Безготівковий розрахунок (для ФОП та юридичних осіб)
-
 
 <b>Терміни виконання замовлення:</b>
 • 1-2 робочих дні після підтвердження замовлення
     """
     bot.send_message(message.chat.id, delivery_text, parse_mode='HTML')
 
-# Обробник для кнопки "📞 Контакти"
+# Обробник для "📞 Контакти"
 @bot.message_handler(func=lambda message: message.text == '📞 Контакти')
 def send_contacts(message):
     contacts_text = """
@@ -111,15 +113,89 @@ LLC.peatenergy@gmail.com
     """
     bot.send_message(message.chat.id, contacts_text, parse_mode='HTML')
 
-# Заглушка для кнопки "🛒 Зробити замовлення" (поки що)
+# Обробник для "🛒 Зробити замовлення"
 @bot.message_handler(func=lambda message: message.text == '🛒 Зробити замовлення')
 def start_order(message):
-    bot.send_message(message.chat.id, "Функція оформлення замовлення тимчасово недоступна. Будь ласка, зателефонуйте нам для оформлення замовлення. 📞")
+    chat_id = message.chat.id
+    user_data[chat_id] = {'step': 'name'}
+    bot.send_message(chat_id, "✏️ Будь ласка, введіть ваше ім'я:")
+
+# Обробник для отримання імені
+@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id]['step'] == 'name')
+def get_name(message):
+    chat_id = message.chat.id
+    user_data[chat_id]['name'] = message.text
+    user_data[chat_id]['step'] = 'phone'
+    
+    keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
+    reg_button = types.KeyboardButton(text="📞 Поділитися контактом", request_contact=True)
+    keyboard.add(reg_button)
+    
+    bot.send_message(chat_id, "📞 Тепер поділіться вашим номером телефону:", reply_markup=keyboard)
+
+# Обробник для отримання контакту
+@bot.message_handler(content_types=['contact'])
+def get_contact(message):
+    chat_id = message.chat.id
+    if chat_id in user_data and user_data[chat_id]['step'] == 'phone':
+        user_data[chat_id]['phone'] = message.contact.phone_number
+        user_data[chat_id]['step'] = 'quantity'
+        bot.send_message(chat_id, "✅ Дякую! Тепер введіть кількість продукції (у тонах):", reply_markup=make_main_menu())
+
+# Обробник для отримання кількості
+@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id]['step'] == 'quantity')
+def get_quantity(message):
+    chat_id = message.chat.id
+    user_data[chat_id]['quantity'] = message.text
+    send_order_to_admin(chat_id)
+    bot.send_message(chat_id, "✅ Ваше замовлення прийнято! Наш менеджер зв'яжеться з вами найближчим часом.")
+    del user_data[chat_id]
+
+# Функція для відправки замовлення адміну
+def send_order_to_admin(chat_id):
+    order = user_data[chat_id]
+    order_text = f"""
+🛒 НОВЕ ЗАМОВЛЕННЯ!
+
+👤 Ім'я: {order['name']}
+📞 Телефон: {order['phone']}
+📦 Кількість: {order['quantity']}
+    
+💬 Чат ID: {chat_id}
+    """
+    # ЗАМІНИТЬ НА ВАШ CHAT_ID (отримайте через @userinfobot)
+    admin_chat_id = '452999752'
+    bot.send_message(admin_chat_id, order_text)
+
+# Обробник для скасування
+@bot.message_handler(func=lambda message: message.text.lower() in ['скасувати', '/cancel', 'відміна'])
+def cancel_order(message):
+    chat_id = message.chat.id
+    if chat_id in user_data:
+        del user_data[chat_id]
+        bot.send_message(chat_id, "❌ Замовлення скасовано.", reply_markup=make_main_menu())
 
 # Обробник всіх інших повідомлень
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     bot.send_message(message.chat.id, "Оберіть опцію з меню 👇", reply_markup=make_main_menu())
+
+# Створюємо Flask сервер для Render
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "🤖 Telegram Bot is running! Use /start in Telegram."
+
+def run_flask():
+    app.run(host='0.0.0.0', port=8000, debug=False)
+
+# Запускаємо Flask у фоновому потоці
+flask_thread = threading.Thread(target=run_flask)
+flask_thread.daemon = True
+flask_thread.start()
+
+print("Flask server started on port 8000")
 
 # Запуск бота
 print("Бот запущений і чекає повідомлення...")
