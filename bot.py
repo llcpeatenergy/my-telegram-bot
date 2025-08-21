@@ -199,8 +199,11 @@ def get_contact(message):
         bot.send_message(chat_id, "✅ Дякую! Тепер введіть кількість продукції (у тонах):", reply_markup=make_main_menu())
         logger.info(f"Користувач {message.chat.id} надав контакт: {message.contact.phone_number}")
 
-# Обробник для отримання номера телефону як тексту
-@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id]['step'] == 'phone')
+# Обробник для отримання номера телефону як тексту (ВИПРАВЛЕНО!)
+@bot.message_handler(func=lambda message: message.chat.id in user_data 
+                     and user_data[message.chat.id]['step'] == 'phone' 
+                     and message.text  # Додано перевірку, що це текстовий message
+                     and not message.text.startswith('/'))  # Ігноруємо команди
 def get_phone_text(message):
     chat_id = message.chat.id
     phone_pattern = r'^(\+?\d{1,3})?[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}$'
