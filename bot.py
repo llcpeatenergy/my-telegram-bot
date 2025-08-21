@@ -55,6 +55,12 @@ def send_order_to_admin(chat_id):
 
 # ========== ОБРОБНИКИ ПОВІДОМЛЕНЬ ==========
 
+# Обробник всіх інших повідомлень (тільки для текстових повідомлень, що не є командами)
+# ПЕРЕМІЩЕНО НА ПОЧАТОК!
+@bot.message_handler(func=lambda message: message.text and not message.text.startswith('/'))
+def echo_all(message):
+    bot.send_message(message.chat.id, "Оберіть опцію з меню 👇", reply_markup=make_main_menu())
+
 # Команди /start та /help
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
@@ -199,11 +205,11 @@ def get_contact(message):
         bot.send_message(chat_id, "✅ Дякую! Тепер введіть кількість продукції (у тонах):", reply_markup=make_main_menu())
         logger.info(f"Користувач {message.chat.id} надав контакт: {message.contact.phone_number}")
 
-# Обробник для отримання номера телефону як тексту (ВИПРАВЛЕНО!)
+# Обробник для отримання номера телефону як тексту
 @bot.message_handler(func=lambda message: message.chat.id in user_data 
                      and user_data[message.chat.id]['step'] == 'phone' 
-                     and message.text  # Додано перевірку, що це текстовий message
-                     and not message.text.startswith('/'))  # Ігноруємо команди
+                     and message.text
+                     and not message.text.startswith('/'))
 def get_phone_text(message):
     chat_id = message.chat.id
     phone_pattern = r'^(\+?\d{1,3})?[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}$'
@@ -237,11 +243,6 @@ def cancel_order(message):
         del user_data[chat_id]
         bot.send_message(chat_id, "❌ Замовлення скасовано.", reply_markup=make_main_menu())
         logger.info(f"Користувач {message.chat.id} скасував замовлення")
-
-# Обробник всіх інших повідомлень (тільки для текстових повідомлень, що не є командами)
-@bot.message_handler(func=lambda message: message.text and not message.text.startswith('/'))
-def echo_all(message):
-    bot.send_message(message.chat.id, "Оберіть опцію з меню 👇", reply_markup=make_main_menu())
 
 if __name__ == '__main__':
     logger.info("Бот запускається...")
