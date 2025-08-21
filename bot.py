@@ -35,6 +35,13 @@ def make_main_menu():
     markup.add(btn_product, btn_price, btn_delivery, btn_contacts, btn_order, btn_location)
     return markup
 
+# Функція для створення кнопки "Почати"
+def make_start_button():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_start = types.KeyboardButton('🚀 Почати роботу')
+    markup.add(btn_start)
+    return markup
+
 # Функція для відправки замовлення адміну
 def send_order_to_admin(chat_id):
     order = user_data[chat_id]
@@ -55,29 +62,35 @@ def send_order_to_admin(chat_id):
 
 # ========== ОБРОБНИКИ ПОВІДОМЛЕНЬ ==========
 
-# Команди /start та /help
+# Вітальне повідомлення при першому контакті
 @bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(func=lambda message: message.text == '🚀 Почати роботу')
 def send_welcome(message):
     welcome_text = """
-Вітаю! Я віртуальний помічник компанії ТЕК.
-Чим можу допомогти? Оберіть опцію з меню👇
-    """
-    bot.send_message(message.chat.id, welcome_text, reply_markup=make_main_menu())
-    logger.info(f"Користувач {message.chat.id} запустив бота")
-    # Додаємо користувача в user_data
-    user_data[message.chat.id] = {'first_message': True}
+🤖 <b>Вітаю! Я віртуальний помічник компанії ТЕК.</b>
 
-# Обробник для першого повідомлення (якщо користувач не написав /start)
-@bot.message_handler(func=lambda message: message.chat.id not in user_data, content_types=['text'])
+💡 <i>Обери потрібну опцію з меню нижче 👇</i>
+    """
+    bot.send_message(message.chat.id, welcome_text, 
+                    parse_mode='HTML', 
+                    reply_markup=make_main_menu())
+    logger.info(f"Користувач {message.chat.id} запустив бота")
+    user_data[message.chat.id] = {'started': True}
+
+# Обробник для будь-якого першого повідомлення
+@bot.message_handler(func=lambda message: message.chat.id not in user_data, 
+                    content_types=['text', 'photo', 'document', 'sticker'])
 def handle_first_message(message):
     welcome_text = """
-Вітаю! Я віртуальний помічник компанії ТЕК.
-Чим можу допомогти? Оберіть опцію з меню👇
+👋 <b>Ласкаво просимо!</b>
+
+Я віртуальний помічник компанії ТЕК. 
+Для початку роботи натисніть кнопку <b>"Почати роботу"</b> 👇
     """
-    bot.send_message(message.chat.id, welcome_text, reply_markup=make_main_menu())
+    bot.send_message(message.chat.id, welcome_text, 
+                    parse_mode='HTML', 
+                    reply_markup=make_start_button())
     logger.info(f"Користувач {message.chat.id} відправив перше повідомлення: {message.text}")
-    # Додаємо користувача в user_data
-    user_data[message.chat.id] = {'first_message': True}
 
 # Обробник для кнопок головного меню
 @bot.message_handler(func=lambda message: message.chat.id in user_data and message.text in [
@@ -251,6 +264,20 @@ def cancel_order(message):
         del user_data[chat_id]
         bot.send_message(chat_id, "❌ Замовлення скасовано.", reply_markup=make_main_menu())
         logger.info(f"Користувач {message.chat.id} скасував замовлення")
+
+# Обробник для невідомих команд після старту
+@bot.message_handler(func=lambda message: message.chat.id in user_data and message.text not in [
+    '📋 Продукція', '💰 Ціни', '🚚 Доставка', '📞 Контакти', 
+    '🗺️ Де ми знаходимось', '🛒 Зробити замовлення', '🚀 Почати роботу'
+])
+def handle_unknown_after_start(message):
+    help_text = """
+🤔 <b>Не розпізнав команду</b>
+
+Будь ласка, оберіть потрібну опцію з меню нижче 👇
+Або напишіть /start для перезапуску бота
+    """
+    bot.send_message(message.chat.id, help_text, parse_mode='HTML', reply_markup=make_main_menu())
 
 if __name__ == '__main__':
     logger.info("Бот запускається...")
