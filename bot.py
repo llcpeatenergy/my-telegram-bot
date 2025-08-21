@@ -55,12 +55,6 @@ def send_order_to_admin(chat_id):
 
 # ========== ОБРОБНИКИ ПОВІДОМЛЕНЬ ==========
 
-# Обробник всіх інших повідомлень (тільки для текстових повідомлень, що не є командами)
-# ПЕРЕМІЩЕНО НА ПОЧАТОК!
-@bot.message_handler(func=lambda message: message.text and not message.text.startswith('/'))
-def echo_all(message):
-    bot.send_message(message.chat.id, "Оберіть опцію з меню 👇", reply_markup=make_main_menu())
-
 # Команди /start та /help
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
@@ -70,9 +64,23 @@ def send_welcome(message):
     """
     bot.send_message(message.chat.id, welcome_text, reply_markup=make_main_menu())
     logger.info(f"Користувач {message.chat.id} запустив бота")
+    # Додаємо користувача в user_data
+    user_data[message.chat.id] = {'first_message': True}
+
+# Обробник для першого повідомлення (якщо користувач не написав /start)
+@bot.message_handler(func=lambda message: message.chat.id not in user_data, content_types=['text'])
+def handle_first_message(message):
+    welcome_text = """
+Вітаю! Я віртуальний помічник компанії ТЕК.
+Чим можу допомогти? Оберіть опцію з меню👇
+    """
+    bot.send_message(message.chat.id, welcome_text, reply_markup=make_main_menu())
+    logger.info(f"Користувач {message.chat.id} відправив перше повідомлення: {message.text}")
+    # Додаємо користувача в user_data
+    user_data[message.chat.id] = {'first_message': True}
 
 # Обробник для кнопок головного меню
-@bot.message_handler(func=lambda message: message.text in [
+@bot.message_handler(func=lambda message: message.chat.id in user_data and message.text in [
     '📋 Продукція', '💰 Ціни', '🚚 Доставка', 
     '📞 Контакти', '🗺️ Де ми знаходимось', '🛒 Зробити замовлення'
 ])
@@ -182,7 +190,7 @@ https://maps.app.goo.gl/?q=50.70145383475299,26.354577705876483
         logger.info(f"Користувач {message.chat.id} почав оформлення замовлення")
 
 # Обробник для отримання імені
-@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id]['step'] == 'name')
+@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get('step') == 'name')
 def get_name(message):
     chat_id = message.chat.id
     user_data[chat_id]['name'] = message.text
@@ -199,7 +207,7 @@ def get_name(message):
 @bot.message_handler(content_types=['contact'])
 def get_contact(message):
     chat_id = message.chat.id
-    if chat_id in user_data and user_data[chat_id]['step'] == 'phone':
+    if chat_id in user_data and user_data[chat_id].get('step') == 'phone':
         user_data[chat_id]['phone'] = message.contact.phone_number
         user_data[chat_id]['step'] = 'quantity'
         bot.send_message(chat_id, "✅ Дякую! Тепер введіть кількість продукції (у тонах):", reply_markup=make_main_menu())
@@ -207,7 +215,7 @@ def get_contact(message):
 
 # Обробник для отримання номера телефону як тексту
 @bot.message_handler(func=lambda message: message.chat.id in user_data 
-                     and user_data[message.chat.id]['step'] == 'phone' 
+                     and user_data[message.chat.id].get('step') == 'phone' 
                      and message.text
                      and not message.text.startswith('/'))
 def get_phone_text(message):
@@ -222,7 +230,7 @@ def get_phone_text(message):
         bot.send_message(chat_id, "❌ Будь ласка, введіть коректний номер телефону або скористайтеся кнопкою 'Поділитися контактом':")
 
 # Обробник для отримання кількості
-@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id]['step'] == 'quantity')
+@bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id].get('step') == 'quantity')
 def get_quantity(message):
     chat_id = message.chat.id
     try:
