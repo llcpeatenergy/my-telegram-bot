@@ -1,6 +1,1 @@
 pyTelegramBotAPI
-
-Flask==2.3.3
-
-schedule==1.2.1
-requests==2.32.0
