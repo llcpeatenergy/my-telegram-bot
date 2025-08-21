@@ -1,14 +1,25 @@
 import telebot
 import os
 import re
+import logging
 from telebot import types
-from flask import Flask
-import threading
+
+# Налаштування логування
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    filename='bot.log'  # Логи будуть записуватися у файл
+)
+logger = logging.getLogger(__name__)
 
 # Токен береться зі змінних середовища
 API_TOKEN = os.getenv('API_TOKEN') 
 # ID адміністратора також береться зі змінних середовища
-ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID', '452999752')  # Значення за замовчуванням на випадок відсутності змінної
+ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID', '452999752')
+
+if not API_TOKEN:
+    logger.error("Не встановлено API_TOKEN! Бот не може бути запущений.")
+    exit(1)
 
 bot = telebot.TeleBot(API_TOKEN)
 
@@ -35,6 +46,7 @@ def send_welcome(message):
 Чим можу допомогти? Оберіть опцію з меню👇
     """
     bot.send_message(message.chat.id, welcome_text, reply_markup=make_main_menu())
+    logger.info(f"Користувач {message.chat.id} запустив бота")
 
 # Обробник для "📋 Продукція"
 @bot.message_handler(func=lambda message: message.text == '📋 Продукція')
@@ -43,15 +55,14 @@ def send_product_info(message):
 🟫 <b>Наші торф'яні пелети</b>
 
 <b>Основні переваги:</b>
-• Висока теплотворність: до 5.2 кВт/кг (як у вугілля)
-• Калорійність від 4600 ккал
+• Висока теплотворність: до 5 кВт/кг (як у вугілля)
 • Низька зольність: менше 10%
 • Екологічне паливо
 • Висока щільність та найбільша тривалість горіння серед пеллет
 
 <b>Фасування:</b>
 • Біг-беги (по 1000 кг)
-• Навалом
+• Доставка навалом
 
 <b>Застосування:</b>
 • Котли опалення
@@ -60,12 +71,13 @@ def send_product_info(message):
 • Твердопаливні генератори
     """
     bot.send_message(message.chat.id, product_text, parse_mode='HTML')
+    logger.info(f"Користувач {message.chat.id} переглянув інформацію про продукцію")
 
 # Обробник для "💰 Ціни"
 @bot.message_handler(func=lambda message: message.text == '💰 Ціни')
 def send_price_info(message):
     price_text = """
-💵 <b>Актуальні ціни на серпень 2025</b>
+💵 <b>Актуальні ціни</b>
 
 <b>Роздріб:</b>
 • Біг Бег (1000 кг) — <b>7000 грн з ПДВ</b>
@@ -76,6 +88,7 @@ def send_price_info(message):
 💡 <i>При замовленні від 23 тонн — додаткова знижка!</i>
     """
     bot.send_message(message.chat.id, price_text, parse_mode='HTML')
+    logger.info(f"Користувач {message.chat.id} переглянув ціни")
 
 # Обробник для "🚚 Доставка"
 @bot.message_handler(func=lambda message: message.text == '🚚 Доставка')
@@ -94,6 +107,7 @@ def send_delivery_info(message):
 • 1-2 робочих дні після підтвердження замовлення
     """
     bot.send_message(message.chat.id, delivery_text, parse_mode='HTML')
+    logger.info(f"Користувач {message.chat.id} переглянув умови доставки")
 
 # Обробник для "📞 Контакти"
 @bot.message_handler(func=lambda message: message.text == '📞 Контакти')
@@ -111,12 +125,12 @@ LLC.peatenergy@gmail.com
 Рівненський район, Забороль вул. Колгоспна 41Є
 
 <b>Графік роботи:</b>
-Пн-Пт: 9:00-19:00
-Сб-Нд: 11:00-19:00
+Пн-Нд: 9:00-19:00
 
 🌐 <b>Наш сайт:</b> www.peat-energy.com.ua
     """
     bot.send_message(message.chat.id, contacts_text, parse_mode='HTML')
+    logger.info(f"Користувач {message.chat.id} переглянув контакти")
 
 # Обробник для "🗺️ Де ми знаходимось"
 @bot.message_handler(func=lambda message: message.text == '🗺️ Де ми знаходимось')
@@ -139,10 +153,10 @@ def send_location(message):
 https://maps.app.goo.gl/?q=50.70145383475299,26.354577705876483
 
 <b>Графік роботи:</b>
-Пн-Пт: 9:00-19:00
-Сб-Нд: 11:00-19:00
+Пн-Нд: 9:00-19:00
 """
     bot.send_message(message.chat.id, maps_text, parse_mode='HTML')
+    logger.info(f"Користувач {message.chat.id} переглянув локацію")
 
 # Обробник для "🛒 Зробити замовлення"
 @bot.message_handler(func=lambda message: message.text == '🛒 Зробити замовлення')
@@ -150,6 +164,7 @@ def start_order(message):
     chat_id = message.chat.id
     user_data[chat_id] = {'step': 'name'}
     bot.send_message(chat_id, "✏️ Будь ласка, введіть ваше ім'я:")
+    logger.info(f"Користувач {message.chat.id} почав оформлення замовлення")
 
 # Обробник для отримання імені
 @bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id]['step'] == 'name')
@@ -163,6 +178,7 @@ def get_name(message):
     keyboard.add(reg_button)
     
     bot.send_message(chat_id, "📞 Тепер поділіться вашим номером телефону:", reply_markup=keyboard)
+    logger.info(f"Користувач {message.chat.id} ввів ім'я: {message.text}")
 
 # Обробник для отримання контакту
 @bot.message_handler(content_types=['contact'])
@@ -172,6 +188,7 @@ def get_contact(message):
         user_data[chat_id]['phone'] = message.contact.phone_number
         user_data[chat_id]['step'] = 'quantity'
         bot.send_message(chat_id, "✅ Дякую! Тепер введіть кількість продукції (у тонах):", reply_markup=make_main_menu())
+        logger.info(f"Користувач {message.chat.id} надав контакт: {message.contact.phone_number}")
 
 # Обробник для отримання номера телефону як тексту (альтернатива контакту)
 @bot.message_handler(func=lambda message: message.chat.id in user_data and user_data[message.chat.id]['step'] == 'phone')
@@ -183,6 +200,7 @@ def get_phone_text(message):
         user_data[chat_id]['phone'] = message.text
         user_data[chat_id]['step'] = 'quantity'
         bot.send_message(chat_id, "✅ Дякую! Тепер введіть кількість продукції (у тонах):", reply_markup=make_main_menu())
+        logger.info(f"Користувач {message.chat.id} ввів телефон: {message.text}")
     else:
         bot.send_message(chat_id, "❌ Будь ласка, введіть коректний номер телефону або скористайтеся кнопкою 'Поділитися контактом':")
 
@@ -196,6 +214,7 @@ def get_quantity(message):
         user_data[chat_id]['quantity'] = quantity
         send_order_to_admin(chat_id)
         bot.send_message(chat_id, "✅ Ваше замовлення прийнято! Наш менеджер зв'яжеться з вами найближчим часом.", reply_markup=make_main_menu())
+        logger.info(f"Користувач {message.chat.id} замовив {quantity} тонн")
         del user_data[chat_id]
     except ValueError:
         # Якщо не вдалося перетворити, просимо ввести ще раз
@@ -213,7 +232,11 @@ def send_order_to_admin(chat_id):
     
 💬 Чат ID: {chat_id}
     """
-    bot.send_message(ADMIN_CHAT_ID, order_text)
+    try:
+        bot.send_message(ADMIN_CHAT_ID, order_text)
+        logger.info(f"Замовлення від {chat_id} відправлено адміністратору")
+    except Exception as e:
+        logger.error(f"Помилка відправки замовлення адміністратору: {e}")
 
 # Обробник для скасування
 @bot.message_handler(func=lambda message: message.text.lower() in ['скасувати', '/cancel', 'відміна', 'відмінити'])
@@ -222,53 +245,21 @@ def cancel_order(message):
     if chat_id in user_data:
         del user_data[chat_id]
         bot.send_message(chat_id, "❌ Замовлення скасовано.", reply_markup=make_main_menu())
+        logger.info(f"Користувач {message.chat.id} скасував замовлення")
 
 # Обробник всіх інших повідомлень
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     bot.send_message(message.chat.id, "Оберіть опцію з меню 👇", reply_markup=make_main_menu())
 
-# Створюємо Flask сервер для Render
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "🤖 Telegram Bot is running! Use /start in Telegram."
-
-def run_flask():
-    app.run(host='0.0.0.0', port=8000, debug=False)
-
-# Запускаємо Flask у фоновому потоці
-flask_thread = threading.Thread(target=run_flask)
-flask_thread.daemon = True
-flask_thread.start()
-
-print("Flask server started on port 8000")
-
-# Додаємо періодичні ping-и для Render
-import requests
-import schedule
-import time
-
-def ping_server():
+if __name__ == '__main__':
+    logger.info("Бот запускається...")
+    print("Бот запущений і чекає повідомлення...")
+    
+    # Додаємо обробник для перехоплення помилок
     try:
-        response = requests.get('https://my-telegram-bot-8118.onrender.com', timeout=5)
-        print(f"Ping successful: {response.status_code}")
+        bot.infinity_polling(timeout=60, long_polling_timeout=60)
     except Exception as e:
-        print(f"Ping failed: {e}")
-
-def run_ping_schedule():
-    schedule.every(10).minutes.do(ping_server)
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
-ping_thread = threading.Thread(target=run_ping_schedule)
-ping_thread.daemon = True
-ping_thread.start()
-
-print("Ping scheduler started")
-
-# Запуск бота
-print("Бот запущений і чекає повідомлення...")
-bot.infinity_polling()
+        logger.error(f"Помилка в роботі бота: {e}")
+        print(f"Сталася помилка: {e}")
+        # Можна додати логіку перезапуску тут
